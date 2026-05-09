@@ -1,6 +1,6 @@
 """
 Borsa İstanbul (BIST) Reinforcement Learning Veri Yükleyici Modülü
-Yazar: Senior AI Engineer
+Yazar: Senior AI Engineer & RL Takımı
 
 Bu modül; MLP, CNN, LSTM, GRU ve Dueling DQN modellerinin tümüne standartlaştırılmış
 3D Tensör boyutunda veri sağlamakla yükümlüdür. Finansal mühendislik ve Anti-Data Leakage
@@ -18,7 +18,7 @@ from sklearn.preprocessing import MinMaxScaler
 
 class BISTDataLoader:
     """
-    BIST hisse senedi verilerini modeller (LSTM, GRU, 1D-CNN, DQN, MLP) için 
+    BIST hisse senedi verilerini modeller (LSTM, GRU, 1D-CNN, DQN, MLP) için
     hazırlayan merkezi veri ardışık düzeni (pipeline) sınıfı.
     """
 
@@ -35,11 +35,13 @@ class BISTDataLoader:
         self.window_size = window_size
         self.test_split = test_split
         self.scaler = MinMaxScaler(feature_range=(0, 1))
+        # Normalizasyonun (Min-Max Scaling) tanımlandığı kısım.
 
     def load_data(self, symbol: str) -> pd.DataFrame:
         """
         Ham CSV dosyasını okur, kronolojik olarak sıralar ve eksik/hatalı verileri onarır.
-        
+
+        - [Gürültü Filtresi]: 47 sütunluk ham veriden sadece OHLCV sütunlarını filtreler.
         - Hacmi (Volume) 0 olan, piyasanın kapalı olduğu günleri veri setinden çıkarır.
         - Look-ahead bias'ı önlemek için NaN değerleri SADECE FFill (İleri Doldurma) ile temizler.
         - FFill sonrası en başta kalan (geçmişi olmayan) NaN satırlarını düşer (dropna).
@@ -49,7 +51,7 @@ class BISTDataLoader:
 
         Returns:
             pd.DataFrame: Temizlenmiş ve sıralanmış pandas DataFrame.
-            
+
         Raises:
             FileNotFoundError: Eğer belirtilen sembole ait veri dosyası bulunamazsa.
         """
@@ -59,6 +61,22 @@ class BISTDataLoader:
 
         # Veriyi yükle
         df = pd.read_csv(file_path)
+
+        # 1. Gürültü Filtresi (Feature Selection):
+        # Modellerin performansını artırmak için 47 sütundan sadece kritik olan 6'sı seçilir.
+        columns_to_keep = {
+            'TRADE DATE': 'Date',
+            'OPENING PRICE': 'Open',
+            'HIGHEST PRICE': 'High',
+            'LOWEST PRICE': 'Low',
+            'CLOSING PRICE': 'Close',
+            'TOTAL TRADED VOLUME': 'Volume'
+        }
+
+        # Sadece mevcut olan hedef sütunları filtrele ve isimlerini standartlaştır
+        existing_cols = {k: v for k, v in columns_to_keep.items() if k in df.columns}
+        df = df[list(existing_cols.keys())]
+        df.rename(columns=existing_cols, inplace=True)
 
         # Tarihe göre kronolojik sıralama (Süreklilik ve nedensellik için kritik)
         if 'Date' in df.columns:
@@ -81,7 +99,7 @@ class BISTDataLoader:
     def add_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         pandas_ta kullanarak durum uzayına (state space) teknik göstergeleri ekler.
-        
+
         Eklenen Göstergeler:
         - SMA_20 ve SMA_50 (Trend)
         - RSI_14 (Momentum)
@@ -102,7 +120,7 @@ class BISTDataLoader:
 
         # Momentum İndikatörü: RSI (Relative Strength Index)
         data['RSI_14'] = ta.rsi(data['Close'], length=14)
-        
+
         # MACD İndikatörü
         # ta.macd varsayılan olarak MACD_12_26_9, MACDh_12_26_9, MACDs_12_26_9 döner.
         macd_df = ta.macd(data['Close'], fast=12, slow=26, signal=9)
@@ -114,27 +132,33 @@ class BISTDataLoader:
         data.dropna(inplace=True)
         return data
 
-    def scale_and_window(self, df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
+    def scale_and_window(self, df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
-        Anti-Data Leakage kuralına uygun ölçeklendirme (MinMaxScaler) yapar ve 
+        Anti-Data Leakage kuralına uygun ölçeklendirme (MinMaxScaler) yapar ve
         modeller için (Samples, Window_Size, Features) boyutunda 3D tensörler oluşturur.
 
         İşlem Adımları:
         1. Train/Test ayrım noktası belirlenir (shuffle=False kuralı).
-        2. Scaler SADECE Train setinde fit edilir. Gelecek verisi eğitime sızmaz.
-        3. Tüm veri bu parametrelerle transform edilir.
-        4. Belirlenen pencere boyutunda kayan pencereler oluşturulur.
-        5. Pencereler Train ve Test olarak bölünür.
+        2. Real Price Extraction: Ödül hesabı için normalize edilmemiş fiyatlar saklanır.
+        3. Scaler SADECE Train setinde fit edilir. Gelecek verisi eğitime sızmaz.
+        4. Tüm veri bu parametrelerle transform edilir.
+        5. Belirlenen pencere boyutunda kayan pencereler oluşturulur.
+        6. Pencereler Train ve Test olarak bölünür.
 
         Args:
             df (pd.DataFrame): Göstergelerin eklendiği, temizlenmiş veri seti.
 
         Returns:
-            Tuple[np.ndarray, np.ndarray]: (X_train, X_test) 3D numpy tensörleri.
+            Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+                (X_train, X_test, prices_train, prices_test) tensörleri ve fiyat dizileri.
         """
         # String vb. sızmış olabilecek sütunlara karşı güvenlik önlemi (Sadece sayısalları al)
         numeric_df = df.select_dtypes(include=[np.number])
         data_values = numeric_df.values
+
+        # [Real Price Extraction]: Ödül fonksiyonunda kâr/zarar hesabı için ham kapanış fiyatlarını sakla.
+        close_idx = df.columns.get_loc('Close')
+        real_close_prices = data_values[:, close_idx]
 
         # Zaman serisi kronolojisine uygun (shuffle=False) Split Indeksi
         split_idx = int(len(data_values) * (1 - self.test_split))
@@ -149,21 +173,30 @@ class BISTDataLoader:
         # 3D Tensor Yapılandırması (Windowing)
         # Hedef Boyut: (Num_Samples, Window_Size, Num_Features)
         windows = []
+        real_prices = [] # Her pencereye karşılık gelen gerçek fiyatlar
+
         for i in range(len(scaled_data) - self.window_size + 1):
             window = scaled_data[i : i + self.window_size]
             windows.append(window)
 
-        windows = np.array(windows)
+            # Pencerenin son günündeki (ajanın aksiyon alacağı an) gerçek fiyatı kaydet
+            real_prices.append(real_close_prices[i + self.window_size - 1])
 
-        # Oluşan pencereleri zaman sıralamasını bozmadan (shuffle=False) ikiye böl
+        windows = np.array(windows)
+        real_prices = np.array(real_prices)
+
+        # Oluşan pencereleri ve fiyatları zaman sıralamasını bozmadan ikiye böl
         window_split_idx = int(len(windows) * (1 - self.test_split))
 
         X_train = windows[:window_split_idx]
         X_test = windows[window_split_idx:]
 
-        return X_train, X_test
+        prices_train = real_prices[:window_split_idx]
+        prices_test = real_prices[window_split_idx:]
 
-    def get_pipeline_data(self, symbol: str) -> Tuple[np.ndarray, np.ndarray]:
+        return X_train, X_test, prices_train, prices_test
+
+    def get_pipeline_data(self, symbol: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
         Ham CSV dosyasından modeller için hazır 3D tensöre uzanan tam süreci (pipeline) tek kalemde yönetir.
 
@@ -171,15 +204,16 @@ class BISTDataLoader:
             symbol (str): İşlenecek hisse senedi sembolü (Örn: 'THYAO').
 
         Returns:
-            Tuple[np.ndarray, np.ndarray]: X_train ve X_test 3D Numpy tensörleri.
+            Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+                X_train, X_test ve kâr/zarar hesabı için prices_train, prices_test.
         """
-        # 1. Dosya Yolu ve Veri Yükleme (Eksik veriler temizlenir)
+        # 1. Dosya Yolu ve Veri Yükleme (Eksik veriler temizlenir ve gürültü filtrelenir)
         df_raw = self.load_data(symbol)
-        
+
         # 2. Öznitelik Mühendisliği (Teknik indikatörler eklenir)
         df_features = self.add_indicators(df_raw)
-        
-        # 3. Sızıntı Önleyici Normalizasyon ve 3D Tensor Dönüşümü
-        X_train, X_test = self.scale_and_window(df_features)
-        
-        return X_train, X_test
+
+        # 3. Sızıntı Önleyici Normalizasyon, Gerçek Fiyat Ayıklama ve 3D Tensor Dönüşümü
+        X_train, X_test, prices_train, prices_test = self.scale_and_window(df_features)
+
+        return X_train, X_test, prices_train, prices_test
