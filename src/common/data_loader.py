@@ -83,6 +83,8 @@ class BISTDataLoader:
             df['Date'] = pd.to_datetime(df['Date'])
             df.sort_values('Date', ascending=True, inplace=True)
             df.set_index('Date', inplace=True)
+            # Duplicate tarih kayıtlarını temizle
+            df = df[~df.index.duplicated(keep='first')]
 
         # 1. Hacim (Volume) 0 olan satırların çıkarılması (Piyasanın kapalı olduğu sentetik günler)
         if 'Volume' in df.columns:
