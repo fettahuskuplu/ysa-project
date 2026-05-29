@@ -1,1 +1,7 @@
 docs/project_overview.md
+venv/
+.venv/
+**/venv/
+__pycache__/
+*.pyc
+.vscode/
