@@ -1,7 +1,4 @@
 """
-Borsa İstanbul (BIST) LSTM-DQN Model Mimarisi
-Yazar: Senior AI Engineer & RL Takımı
-
 Bu modül; Stacked LSTM (çok katmanlı) tabanlı bir Deep Q-Network (DQN) mimarisini tanımlar.
 BIST piyasa verilerindeki zamansal bağımlılıkları öğrenmek için tasarlanmıştır.
 

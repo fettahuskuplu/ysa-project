@@ -1,13 +1,12 @@
 """
-Borsa İstanbul (BIST) LSTM Double DQN Ajanı
-Yazar: Senior AI Engineer & RL Takımı
+Borsa İstanbul (BIST) LSTM Standart DQN Ajanı
 
-Bu modül; Double Deep Q-Network (DDQN) algoritmasını LSTM mimarisi üzerinde
+Bu modül; Standart Deep Q-Network (DQN) algoritmasını LSTM mimarisi üzerinde
 uygulayan RL ajanını tanımlar.
 
 Temel Mekanizmalar:
-- Double DQN: Overestimation bias'ı azaltmak için aksiyon seçimi (online) ve
-  değer tahmini (target) iki ayrı ağ ile yapılır.
+- Standart DQN: Aksiyon seçimi ve değer tahmini doğrudan Target ağ üzerinden 
+  maksimum Q-değeri (max_a') seçilerek gerçekleştirilir.
 - Soft Update (Polyak Averaging): Target ağ, her replay adımında τ=0.005 ile
   kademeli güncellenir → Hard copy'ye göre çok daha stabil öğrenme sağlar.
 - Experience Replay: Geçmiş deneyimleri rastgele örnekleyerek temporal
@@ -32,7 +31,7 @@ Experience = Tuple[np.ndarray, int, float, np.ndarray, bool]
 
 class LSTMDQNAgent:
     """
-    LSTM tabanlı Double DQN ajanı.
+    LSTM tabanlı Standart DQN ajanı.
 
     Bu ajan, BIST piyasa ortamında (TradingEnvironment) alım-satım kararları
     vererek portföy değerini maksimize etmeyi öğrenir.
@@ -55,7 +54,7 @@ class LSTMDQNAgent:
         gamma: float = 0.95,
         epsilon: float = 1.0,
         epsilon_min: float = 0.01,
-        epsilon_decay: float = 0.995,
+        epsilon_decay: float = 0.999,
         tau: float = 0.005,
         memory_size: int = 2000,
         dropout_rate: float = 0.25,
@@ -90,7 +89,7 @@ class LSTMDQNAgent:
         # deque: FIFO yapısı → Buffer dolduğunda en eski deneyimler otomatik silinir
         self.memory: Deque[Experience] = deque(maxlen=memory_size)
 
-        # --- Dual Network Yapısı (Double DQN) ---
+       # --- Dual Network Yapısı (Standart DQN) ---
         # Online (Policy) Network: Her adımda güncellenen ana ağ
         self.model: tf.keras.Model = build_lstm_model(
             state_shape=state_shape,
@@ -189,12 +188,11 @@ class LSTMDQNAgent:
         """
         Experience Replay ile mini-batch öğrenme adımı gerçekleştirir.
 
-        Double DQN Bellman Güncellemesi:
-            Q_target(s, a) = r + γ · Q_target(s', argmax_a' Q_online(s', a'))
+        Standart DQN Bellman Güncellemesi:
+            Q_target(s, a) = r + γ · max_a' Q_target(s', a')
 
-        - Online ağ (self.model): En iyi aksiyonu SEÇer (argmax)
-        - Target ağ (self.target_model): Bu aksiyonun Q-değerini DEĞERLENDİRİR
-        - Bu ayrışma, standart DQN'deki Q-değeri aşırı tahminini (overestimation) engeller.
+        - Target ağ (self.target_model): Sonraki durumun en büyük Q-değerini doğrudan seçer.
+        - Bu yaklaşım, gruptaki diğer temel modellerle (MLP, CNN) adil bir karşılaştırma sağlar.
 
         Args:
             batch_size: Mini-batch boyutu.
@@ -217,31 +215,29 @@ class LSTMDQNAgent:
         next_states: np.ndarray = np.array([exp[3] for exp in minibatch])
         dones: np.ndarray = np.array([exp[4] for exp in minibatch], dtype=np.float32)
 
-        # --- 2. Double DQN: İki Aşamalı Q-Değeri Hesaplama ---
+        # --- 2. Standard DQN: Doğrudan Target Ağ ile Q-Değeri Hesaplama ---
         # model() doğrudan çağrısı predict()'e göre ~3x hızlıdır (batch overhead yok).
 
-        # Aşama A: Online ağ ile sonraki durumlarda EN İYİ aksiyonları belirle
-        q_next_online: np.ndarray = self.model(next_states, training=False).numpy()
-        best_actions: np.ndarray = np.argmax(q_next_online, axis=1)
-
-        # Aşama B: Target ağ ile bu aksiyonların Q-değerlerini hesapla
+        # Target ağ ile sonraki durumların Q-değerlerini hesapla
         q_next_target: np.ndarray = self.target_model(next_states, training=False).numpy()
+
+        # Her örnek için maksimum Q-değerini al
+        max_q_next: np.ndarray = np.max(q_next_target, axis=1)
 
         # --- 3. Bellman Denklemi (Vektörize) ---
         # done=True ise gelecek ödül sıfırlanır (terminal state)
-        # target = r + γ · Q_target(s', argmax Q_online(s', ·))
-        batch_indices: np.ndarray = np.arange(batch_size)
+        # target = r + γ · max_a' Q_target(s', a')
         target_q: np.ndarray = (
             rewards
             + (1.0 - dones)
             * self.gamma
-            * q_next_target[batch_indices, best_actions]
+            * max_q_next
         )
 
         # --- 4. Mevcut Q-Değerlerini Güncelle ---
         # Sadece alınan aksiyona ait Q-değeri güncellenir, diğerleri sabit kalır
         q_current: np.ndarray = self.model(states, training=False).numpy()
-        q_current[batch_indices, actions] = target_q
+        q_current[np.arange(batch_size), actions] = target_q
 
         # --- 5. Online Ağı Eğit ---
         # epochs=1: Her replay adımında tek geçiş → Ajanın istikrarını korur

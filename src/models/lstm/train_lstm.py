@@ -1,6 +1,5 @@
 """
-Borsa İstanbul (BIST) LSTM Double DQN — Eğitim Modülü
-Yazar: Senior AI Engineer & RL Takımı
+Borsa İstanbul (BIST) LSTM Standart DQN — Eğitim Modülü
 
 Bu modül; LSTM-DQN ajanının episode tabanlı eğitim döngüsünü yönetir.
 
@@ -77,10 +76,10 @@ def train_agent(
                       DQN literatüründe 4 standart değerdir (Mnih et al. 2015).
 
     Returns:
-        Dict[str, Any]: Son episode'un performans metrikleri ve eğitim geçmişi.
-            - 'best_sharpe': Eğitim boyunca görülen en iyi Sharpe Ratio.
-            - 'final_metrics': Son episode'un metrik sözlüğü.
-            - 'sharpe_history': Tüm episode'ların Sharpe Ratio geçmişi.
+        Dict[str, Any]: Eğitim sürecine ait genel performans metrikleri ve geçmiş veriler.
+            - 'best_sharpe': Eğitim boyunca elde edilen en yüksek (optimum) Sharpe Ratio.
+            - 'final_metrics': En son tamamlanan episode'un metrik sözlüğü.
+            - 'sharpe_history': Tüm episode'lar boyunca kaydedilen Sharpe Ratio gelişim geçmişi.
     """
     best_sharpe: float = -np.inf
     sharpe_history: list[float] = []
@@ -127,8 +126,26 @@ def train_agent(
         current_sharpe: float = metrics["sharpe_ratio"]
         sharpe_history.append(current_sharpe)
 
-        if current_sharpe > best_sharpe:
-            best_sharpe = current_sharpe
+        # --- Greedy Evaluation: Checkpoint Kararı İçin ---
+        # Epsilon-greedy episode Sharpe'ı yanıltıcıdır: yüksek ε'de rastgele
+        # aksiyonlar tesadüfen iyi sonuç verebilir ama model bunu öğrenmemiştir.
+        # Gerçek model kalitesini ölçmek için train verisi üzerinde ε=0 greedy
+        # evaluation yapılır. Checkpoint kararı bu değere göre verilir.
+        greedy_metrics: Dict[str, float] = evaluate_agent(
+            agent=agent,
+            market_data=env.market_data,
+            real_prices=env.real_prices,
+            initial_balance=env.initial_balance,
+        )
+        greedy_sharpe: float = greedy_metrics["sharpe_ratio"]
+
+        if greedy_sharpe > best_sharpe:
+            best_sharpe = greedy_sharpe
+            # En iyi ağırlıkları anında diske kilitle (Model Checkpointing)
+            _save_dir = os.path.join(_PROJECT_ROOT, "saved_models")
+            os.makedirs(_save_dir, exist_ok=True)
+            agent.save(os.path.join(_save_dir, "lstm_best.keras"))
+            logger.info(f"  --> [CHECKPOINT] Yeni en iyi model diske kilitlendi! Greedy Sharpe: {best_sharpe:.4f}")
 
         final_metrics = metrics
 
@@ -141,7 +158,8 @@ def train_agent(
             f"MDD: {metrics['max_drawdown_pct']:>6.2f}% | "
             f"İşlem: {metrics['trade_count']:>4d} | "
             f"Adım: {step_count:>4d} | "
-            f"ε: {agent.epsilon:.4f}"
+            f"ε: {agent.epsilon:.4f} | "
+            f"Greedy: {greedy_sharpe:>+6.3f}"
         )
 
 
@@ -206,7 +224,7 @@ def evaluate_agent(
 # ======================================================================
 def main() -> None:
     """
-    LSTM Double DQN eğitim pipeline'ının ana giriş noktası.
+    LSTM Standart DQN eğitim pipeline'ının ana giriş noktası.
 
     Akış:
     1. CLI argümanlarını oku.
@@ -217,7 +235,7 @@ def main() -> None:
     """
     # --- CLI Argümanları ---
     parser = argparse.ArgumentParser(
-        description="BIST LSTM Double DQN — Eğitim Pipeline'ı"
+        description="BIST LSTM Standart DQN — Eğitim Pipeline'ı"
     )
     parser.add_argument(
         "--symbol",
@@ -245,13 +263,13 @@ def main() -> None:
     )
     args: argparse.Namespace = parser.parse_args()
 
-    # --- Sabit Hiperparametreler (Optuna Sonuçlarından) ---
+    # --- Sabit Hiperparametreler (Manuel Deneysel Optimizasyon) ---
     N_UNITS: int = 32
-    LEARNING_RATE: float = 0.0007
+    LEARNING_RATE: float = 0.001
 
     # --- Banner ---
     logger.info("=" * 70)
-    logger.info("  BIST LSTM Double DQN — Eğitim Pipeline'ı")
+    logger.info("  BIST LSTM Standart DQN — Eğitim Pipeline'ı")
     logger.info(f"  Sembol: {args.symbol} | Episodes: {args.episodes}")
     logger.info(f"  n_units: {N_UNITS} | lr: {LEARNING_RATE}")
     logger.info("=" * 70)
@@ -306,6 +324,17 @@ def main() -> None:
     # =================================================================
     logger.info("[3/4] Test seti üzerinde değerlendirme yapılıyor...")
 
+    # --- En İyi Modeli Geri Yükle (Checkpoint → RAM) ---
+    # train_agent() döngüsü bittiğinde RAM'deki agent, son episode'un
+    # (potansiyel olarak degraded) ağırlıklarını taşır. Test setine
+    # girmeden önce, diske kilitlediğimiz en iyi ağırlıkları geri yüklüyoruz.
+    best_model_path: str = os.path.join(_PROJECT_ROOT, "saved_models", "lstm_best.keras")
+    agent.load(best_model_path)
+    logger.info(
+        f"  --> [CHECKPOINT RESTORE] En iyi model geri yüklendi! "
+        f"(Train Best Sharpe: {train_result['best_sharpe']:+.4f})"
+    )
+
     test_metrics: Dict[str, float] = evaluate_agent(
         agent=agent,
         market_data=X_test,
@@ -324,15 +353,16 @@ def main() -> None:
     logger.info("=" * 70)
 
     # =================================================================
-    # AŞAMA 4: Model Kaydetme
+    # AŞAMA 4: Model Doğrulama
     # =================================================================
-    save_dir: str = os.path.join(_PROJECT_ROOT, "saved_models")
-    os.makedirs(save_dir, exist_ok=True)
-
-    save_path: str = os.path.join(save_dir, "lstm_best.keras")
-    agent.save(save_path)
-    logger.info(f"[4/4] Model kaydedildi → {save_path}")
-    logger.info("Pipeline tamamlandı. ✓")
+    # NOT: agent.save() artık burada çağrılmıyor. En iyi ağırlıklar,
+    # train_agent() içindeki checkpoint mekanizması tarafından eğitim
+    # sırasında best Sharpe yakalandığı anda diske yazılıyor.
+    # Bu sayede son episode'daki (potansiyel olarak degraded) ağırlıkların
+    # en iyi modelin üzerine yazması engelleniyor.
+    save_path: str = os.path.join(_PROJECT_ROOT, "saved_models", "lstm_best.keras")
+    logger.info(f"[4/4] En iyi model güvende → {save_path}")
+    logger.info(f"  ✓ Pipeline tamamlandı. Best Sharpe: {train_result['best_sharpe']:+.4f}")
 
 
 if __name__ == "__main__":

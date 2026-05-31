@@ -1,5 +1,5 @@
 """
-LSTM Double DQN Modül Paketi
+LSTM Standart DQN Modül Paketi
 Borsa İstanbul (BIST) LSTM tabanlı Deep Reinforcement Learning bileşenleri.
 """
 
