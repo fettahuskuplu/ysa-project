@@ -1,1 +1,3 @@
 docs/project_overview.md
+__pycache__/
+*.pyc
