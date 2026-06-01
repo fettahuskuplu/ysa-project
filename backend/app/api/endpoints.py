@@ -106,8 +106,8 @@ def get_dashboard_metrics(
     # 3. SABİT MODEL KARŞILAŞTIRMA TABLOSU
     # =========================================================================
     comparison_table = [
-        ModelPerformanceRowSchema(model_name="MLP DQN (Senin Modelin)", getiri_pct=23.92, sharpe=0.79, mdd_pct=-27.43, win_rate_pct=54.2, islem_sayisi=61),
-        ModelPerformanceRowSchema(model_name="LSTM Double DQN", getiri_pct=32.14, sharpe=1.12, mdd_pct=-14.56, win_rate_pct=58.3, islem_sayisi=45),
+        ModelPerformanceRowSchema(model_name="MLP DQN", getiri_pct=23.92, sharpe=0.79, mdd_pct=-27.43, win_rate_pct=54.2, islem_sayisi=61),
+        ModelPerformanceRowSchema(model_name="LSTM DQN", getiri_pct=32.14, sharpe=1.12, mdd_pct=-14.56, win_rate_pct=58.3, islem_sayisi=45),
         ModelPerformanceRowSchema(model_name="GRU DQN", getiri_pct=28.45, sharpe=0.95, mdd_pct=-16.20, win_rate_pct=56.8, islem_sayisi=52),
         ModelPerformanceRowSchema(model_name="CNN DQN", getiri_pct=35.80, sharpe=1.24, mdd_pct=-12.45, win_rate_pct=61.2, islem_sayisi=38),
         ModelPerformanceRowSchema(model_name="Dueling DQN", getiri_pct=41.25, sharpe=1.38, mdd_pct=-9.85, win_rate_pct=64.5, islem_sayisi=42),
