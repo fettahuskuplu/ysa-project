@@ -23,23 +23,43 @@ import { DashboardContext } from './dashboardContext';
 // ════════════════════════════════════════════════════════════════════════════
 
 const DEFAULT_MODEL = 'Dueling DQN';
-const DEFAULT_SYMBOL = 'THYAO';   // Backend'de tam hazır olan borsa sembolü
+const DEFAULT_SYMBOL = 'THYAO';
 
-const getDefaultDateRange = () => {
-  const end = new Date();
-  const start = new Date();
-  start.setMonth(start.getMonth() - 6);
+/** ISO tarihi (YYYY-MM-DD) → TR gösterim (GG.AA.YYYY) */
+function formatDateTr(isoDate) {
+  if (!isoDate) return '';
+  const [y, m, d] = isoDate.split('-');
+  return `${d}.${m}.${y}`;
+}
 
+/** Export edilen test seti zaman serisinden dönem aralığını çıkarır */
+function deriveTestPeriod(timeSeries, equityCurve) {
+  const times = [];
+  for (const bar of timeSeries || []) {
+    if (bar.time) times.push(bar.time);
+  }
+  if (times.length === 0) {
+    for (const point of equityCurve || []) {
+      if (point.time && !String(point.time).startsWith('day-')) times.push(point.time);
+    }
+  }
+  if (times.length === 0) {
+    return { startDate: null, endDate: null, label: '—' };
+  }
+  times.sort();
+  const startDate = times[0];
+  const endDate = times[times.length - 1];
   return {
-    startDate: start.toISOString().split('T')[0],
-    endDate: end.toISOString().split('T')[0],
+    startDate,
+    endDate,
+    label: `${formatDateTr(startDate)} – ${formatDateTr(endDate)}`,
   };
-};
+}
 
 const INITIAL_STATE = {
   selectedModel: DEFAULT_MODEL,
   selectedSymbol: DEFAULT_SYMBOL,
-  dateRange: getDefaultDateRange(),
+  testPeriod: { startDate: null, endDate: null, label: '—' },
 
   timeSeries: [],
   kpiMetrics: {
@@ -56,7 +76,6 @@ const INITIAL_STATE = {
   bist30History: [],
   bist30_history: [],
 
-  availableSymbols: [],
   availableModels: [],
 
   isLoading: true,
@@ -105,8 +124,7 @@ export function DashboardProvider({ children }) {
 
   // ── CANLI VERİ YÜKLEME ORKESTRASYONU ───────────────────────────────────────
   const loadDashboardData = useCallback(
-    async (model, symbol, dateRange) => {
-      // ctchurrent hatası düzeltildi
+    async (model, symbol) => {
       const currentFetchId = ++fetchIdRef.current;
 
       dispatch({ type: ACTION_TYPES.FETCH_START });
@@ -153,10 +171,13 @@ export function DashboardProvider({ children }) {
                 value,
               }));
 
+        const testPeriod = deriveTestPeriod(timeSeries, equityCurve);
+
         dispatch({
           type: ACTION_TYPES.FETCH_SUCCESS,
           payload: {
             timeSeries,
+            testPeriod,
 
             kpiMetrics: {
               cumulativeReturn: backendRawData.metrics?.cumulative_return_pct ?? 0,
@@ -209,7 +230,6 @@ export function DashboardProvider({ children }) {
     async function initialize() {
       try {
 
-        const symbols = ["ACSEL", "THYAO", "TTKOM", "ASELS", "AKBNK"];
         const models = ["Dueling DQN", "MLP DQN", "LSTM DQN", "GRU DQN", "CNN DQN"];
         models.forEach((m, idx) => {
           models[idx] = Object.assign(new String(m), {
@@ -228,17 +248,12 @@ export function DashboardProvider({ children }) {
         dispatch({
           type: ACTION_TYPES.SET_OPTIONS,
           payload: {
-            availableSymbols: symbols,
-            availableModels: models, // Artık düz yazı olduğu için key çakışması yapmayacak!
+            availableModels: models,
           },
         });
 
         // Backend'i ilk saniyede çalışan model ile ayağa kaldırıyoruz
-        await loadDashboardData(
-          DEFAULT_MODEL,
-          DEFAULT_SYMBOL,
-          getDefaultDateRange()
-        );
+        await loadDashboardData(DEFAULT_MODEL, DEFAULT_SYMBOL);
 
         if (cancelled) return;
 
@@ -266,47 +281,23 @@ export function DashboardProvider({ children }) {
         type: ACTION_TYPES.SET_FILTER,
         payload: { selectedModel: modelId },
       });
-      loadDashboardData(modelId, state.selectedSymbol, state.dateRange);
+      loadDashboardData(modelId, DEFAULT_SYMBOL);
     },
-    [loadDashboardData, state.selectedSymbol, state.dateRange]
-  );
-
-  const setSelectedSymbol = useCallback(
-    (symbol) => {
-      dispatch({
-        type: ACTION_TYPES.SET_FILTER,
-        payload: { selectedSymbol: symbol },
-      });
-      loadDashboardData(state.selectedModel, symbol, state.dateRange);
-    },
-    [loadDashboardData, state.selectedModel, state.dateRange]
-  );
-
-  const setDateRange = useCallback(
-    (range) => {
-      dispatch({
-        type: ACTION_TYPES.SET_FILTER,
-        payload: { dateRange: range },
-      });
-      loadDashboardData(state.selectedModel, state.selectedSymbol, range);
-    },
-    [loadDashboardData, state.selectedModel, state.selectedSymbol]
+    [loadDashboardData]
   );
 
   const refreshData = useCallback(() => {
-    loadDashboardData(state.selectedModel, state.selectedSymbol, state.dateRange);
-  }, [loadDashboardData, state.selectedModel, state.selectedSymbol, state.dateRange]);
+    loadDashboardData(state.selectedModel, DEFAULT_SYMBOL);
+  }, [loadDashboardData, state.selectedModel]);
 
   // ── Context değeri (useMemo korumalı) ────────────────────────────────────
   const contextValue = useMemo(
     () => ({
       ...state,
       setSelectedModel,
-      setSelectedSymbol,
-      setDateRange,
       refreshData,
     }),
-    [state, setSelectedModel, setSelectedSymbol, setDateRange, refreshData]
+    [state, setSelectedModel, refreshData]
   );
 
   return (

@@ -1,7 +1,5 @@
 /**
- * ════════════════════════════════════════════════════════════════════════
- * SelectionHeader — Model, Hisse & Tarih Aralığı Seçici
- * ════════════════════════════════════════════════════════════════════════
+ * SelectionHeader — Model, hisse (sabit THYAO) ve test dönemi bilgisi
  */
 
 import { useDashboard } from '../context/dashboardContext';
@@ -10,12 +8,9 @@ export default function SelectionHeader() {
   const {
     selectedModel,
     selectedSymbol,
-    dateRange,
-    availableSymbols,
+    testPeriod,
     availableModels,
     setSelectedModel,
-    setSelectedSymbol,
-    setDateRange,
     isLoading,
   } = useDashboard();
 
@@ -65,78 +60,34 @@ export default function SelectionHeader() {
         </select>
       </div>
 
-      {/* ── Hisse Seçici ── */}
+      {/* ── Hisse (sabit) ── */}
       <div className="flex flex-col gap-1">
-        <label
-          htmlFor="symbol-select"
-          className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] font-medium"
-        >
+        <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] font-medium">
           Hisse
-        </label>
-        <select
-          id="symbol-select"
-          value={selectedSymbol}
-          onChange={(e) => setSelectedSymbol(e.target.value)}
-          disabled={isLoading}
-          className="bg-[var(--color-bg-elevated)] text-[var(--color-text-primary)] text-sm
-                     border border-[var(--color-border-default)] rounded-lg px-3 py-1.5
-                     focus:outline-none focus:border-[var(--color-accent)]
-                     disabled:opacity-50 cursor-pointer transition-smooth"
+        </span>
+        <div
+          className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-bg-elevated)]
+                     px-3 py-1.5 text-sm text-[var(--color-text-primary)]"
         >
-          {availableSymbols.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
+          {selectedSymbol}
+        </div>
       </div>
 
-      {/* ── Tarih Aralığı ── */}
-      <div className="flex items-end gap-2">
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="date-start"
-            className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] font-medium"
-          >
-            Başlangıç
-          </label>
-          <input
-            id="date-start"
-            type="date"
-            value={dateRange.startDate}
-            onChange={(e) =>
-              setDateRange({ ...dateRange, startDate: e.target.value })
-            }
-            disabled={isLoading}
-            className="bg-[var(--color-bg-elevated)] text-[var(--color-text-primary)] text-sm
-                       border border-[var(--color-border-default)] rounded-lg px-3 py-1.5
-                       focus:outline-none focus:border-[var(--color-accent)]
-                       disabled:opacity-50 transition-smooth
-                       [color-scheme:dark]"
-          />
+      {/* ── Test seti dönemi (sabit, export’tan gelen veri) ── */}
+      <div className="flex flex-col gap-1 min-w-[200px]">
+        <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] font-medium">
+          Test dönemi
+        </span>
+        <div
+          className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-bg-elevated)]
+                     px-3 py-1.5 text-sm text-[var(--color-text-primary)]"
+          title="Metrikler ve grafikler modelin hiç görmediği test verisi üzerindedir"
+        >
+          {isLoading ? '…' : testPeriod?.label ?? '—'}
         </div>
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="date-end"
-            className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] font-medium"
-          >
-            Bitiş
-          </label>
-          <input
-            id="date-end"
-            type="date"
-            value={dateRange.endDate}
-            onChange={(e) =>
-              setDateRange({ ...dateRange, endDate: e.target.value })
-            }
-            disabled={isLoading}
-            className="bg-[var(--color-bg-elevated)] text-[var(--color-text-primary)] text-sm
-                       border border-[var(--color-border-default)] rounded-lg px-3 py-1.5
-                       focus:outline-none focus:border-[var(--color-accent)]
-                       disabled:opacity-50 transition-smooth
-                       [color-scheme:dark]"
-          />
-        </div>
+        <span className="text-[10px] text-[var(--color-text-muted)]">
+          Görülmemiş test seti (%20)
+        </span>
       </div>
 
       {/* ── Loading göstergesi ── */}
