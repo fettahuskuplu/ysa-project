@@ -210,7 +210,7 @@ export function DashboardProvider({ children }) {
       try {
 
         const symbols = ["ACSEL", "THYAO", "TTKOM", "ASELS", "AKBNK"];
-        const models = ["MLP DQN", "LSTM DQN", "GRU DQN", "CNN DQN", "Dueling DQN"];
+        const models = ["Dueling DQN", "MLP DQN", "LSTM DQN", "GRU DQN", "CNN DQN"];
         models.forEach((m, idx) => {
           models[idx] = Object.assign(new String(m), {
             id: m,

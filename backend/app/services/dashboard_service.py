@@ -11,8 +11,11 @@ from app.schemas.dashboard import (
 )
 
 MODEL_SLUG_MAP = {
+    "MLP DQN": "mlp_dqn",
+    "LSTM DQN": "lstm_dqn",
+    "GRU DQN": "gru_dqn",
+    "CNN DQN": "cnn_dqn",
     "Dueling DQN": "dueling_dqn",
-    # İleride: "MLP DQN": "mlp_dqn",
 }
 
 
