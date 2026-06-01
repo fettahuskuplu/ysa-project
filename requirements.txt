@@ -1,4 +1,7 @@
 pandas
 numpy
-pandas_ta
+pandas-ta
 scikit-learn
+torch
+torchvision
+torchaudio
