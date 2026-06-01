@@ -10,7 +10,7 @@ class DuelingDQNConfig:
     LEARNING_RATE = 0.0005
     GAMMA = 0.99
     BATCH_SIZE = 64
-    EPISODES = 200
+    EPISODES = 50
 
     # Epsilon-Greedy Strategy
     EPSILON_START = 1.0

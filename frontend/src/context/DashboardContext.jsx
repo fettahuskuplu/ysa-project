@@ -22,7 +22,7 @@ import { DashboardContext } from './dashboardContext';
 // 1) VARSAYILAN DEĞERLERİ & INITIAL STATE
 // ════════════════════════════════════════════════════════════════════════════
 
-const DEFAULT_MODEL = 'MLP DQN'; // varsayılan model
+const DEFAULT_MODEL = 'Dueling DQN';
 const DEFAULT_SYMBOL = 'THYAO';   // Backend'de tam hazır olan borsa sembolü
 
 const getDefaultDateRange = () => {
@@ -118,39 +118,45 @@ export function DashboardProvider({ children }) {
         // Race-condition guard: İstek güncel değilse iptal et
         if (currentFetchId !== fetchIdRef.current) return;
 
-        // ── GRAFİK İÇİN TERTEMİZ BORSA ZAMAN SERİSİ ÜRETİCİSİ ──
-        // Sunucudan gelen kısıtlı sinyalleri, kütüphanenin beklediği 30 günlük teknik indikatör serisine dönüştürüyoruz
-        const generatedTimeSeries = Array.from({ length: 30 }).map((_, index) => {
-          const date = new Date(2026, 0, 1);
-          date.setDate(date.getDate() + index);
-          const dateString = date.toISOString().split('T')[0];
+        const timeSeries = (backendRawData.time_series || []).map((bar) => ({
+          time: bar.time,
+          open: bar.open,
+          high: bar.high,
+          low: bar.low,
+          close: bar.close,
+          signal: bar.signal ?? 0,
+          rsi: bar.rsi ?? 0,
+          macd: bar.macd ?? 0,
+          macdSignal: bar.macdSignal ?? 0,
+          macdHistogram: bar.macdHistogram ?? 0,
+        }));
 
-          // Backend'den gelen gerçek bir sinyal var mı diye kontrol ediyoruz
-          const signalItem = backendRawData.action_signals?.[index % (backendRawData.action_signals?.length || 1)];
-          const hasSignal = index % 5 === 0; // Her 5 günde bir ok işareti fırlat
+        const equityCurve =
+          backendRawData.equity_curve?.length > 0
+            ? backendRawData.equity_curve.map((p) => ({
+                time: p.time,
+                value: p.value,
+              }))
+            : (backendRawData.portfolio_history || []).map((value, index) => ({
+                time: backendRawData.time_series?.[index]?.time ?? `day-${index}`,
+                value,
+              }));
 
-          return {
-            time: dateString,
-            // Mum grafik alanları (Çöküşü engelleyen ana gövde)
-            open: 100 + index + Math.random() * 5,
-            high: 108 + index + Math.random() * 5,
-            low: 95 + index - Math.random() * 5,
-            close: 103 + index + Math.random() * 5,
-            // Sinyal oklari (AL/SAT)
-            signal: hasSignal ? (index % 10 === 0 ? 1 : -1) : 0,
-            // RSI ve MACD alanları (Arkadaşının çizmek istediği indikatörler)
-            rsi: 40 + Math.sin(index) * 25,
-            macd: 2 + Math.sin(index) * 1.5,
-            macdSignal: 1.8 + Math.cos(index) * 1.2,
-            macdHistogram: Math.sin(index) * 0.8
-          };
-        });
+        const benchmarkCurve =
+          backendRawData.benchmark_curve?.length > 0
+            ? backendRawData.benchmark_curve.map((p) => ({
+                time: p.time,
+                value: p.value,
+              }))
+            : (backendRawData.bist30_history || []).map((value, index) => ({
+                time: backendRawData.time_series?.[index]?.time ?? `day-${index}`,
+                value,
+              }));
 
         dispatch({
           type: ACTION_TYPES.FETCH_SUCCESS,
           payload: {
-            // Grafik bileşeninin muhtaç olduğu tüm alanları besledik
-            timeSeries: generatedTimeSeries,
+            timeSeries,
 
             kpiMetrics: {
               cumulativeReturn: backendRawData.metrics?.cumulative_return_pct ?? 0,
@@ -159,7 +165,6 @@ export function DashboardProvider({ children }) {
               totalTrades: backendRawData.metrics?.total_trades ?? 0
             },
 
-            // Tablo satırlarındaki key uyarısını kökten çözen güncelleme:
             benchmarkData: (backendRawData.comparison_table || []).map((row, idx) => ({
               ...row,
               key: row.model_name || idx,
@@ -180,24 +185,8 @@ export function DashboardProvider({ children }) {
               totalTrades: row.islem_sayisi,
               tradeCount: row.islem_sayisi
             })),
-            // Portföy çizgi grafik alanları
-            equityCurve: (backendRawData.portfolio_history || []).map((value, index) => {
-              const date = new Date(2026, 0, 1);
-              date.setDate(date.getDate() + index);
-              return {
-                time: date.toISOString().split('T')[0],
-                value: value
-              };
-            }),
-
-            benchmarkCurve: (backendRawData.bist30_history || []).map((value, index) => {
-              const date = new Date(2026, 0, 1);
-              date.setDate(date.getDate() + index);
-              return {
-                time: date.toISOString().split('T')[0],
-                value: value
-              };
-            })
+            equityCurve,
+            benchmarkCurve,
           },
         });
       } catch (err) {
