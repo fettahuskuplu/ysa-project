@@ -120,6 +120,12 @@ export default function MainTradingChart() {
     sync(mc, [pc, rc]);
     [pc, rc, mc].forEach((c) => c.timeScale().fitContent());
 
+    [priceRef, rsiRef, macdRef].forEach(ref => {
+      ref.current?.querySelectorAll('a').forEach(link => {
+        if (link.href.includes('tradingview')) link.style.display = 'none';
+      });
+    });
+
     const onResize = () => {
       if (priceRef.current) pc.applyOptions({ width: priceRef.current.clientWidth });
       if (rsiRef.current) rc.applyOptions({ width: rsiRef.current.clientWidth });
