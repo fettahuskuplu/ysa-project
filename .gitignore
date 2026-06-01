@@ -1,5 +1,11 @@
 docs/project_overview.md
+venv/
 .venv/
-.venv2/
-*.pth
+**/venv/
 __pycache__/
+*.pyc
+.vscode/
+data/
+*.csv
+
+*.pth

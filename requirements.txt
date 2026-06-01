@@ -1,3 +1,7 @@
 pandas
 numpy
+pandas-ta
 scikit-learn
+torch
+torchvision
+torchaudio

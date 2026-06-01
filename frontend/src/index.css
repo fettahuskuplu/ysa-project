@@ -1,0 +1,139 @@
+@import "tailwindcss";
+
+
+@theme {
+  /* ── Core palette ────────────────────────────────────── */
+  --color-bg-primary:     #131722;
+  --color-bg-secondary:   #1c2030;
+  --color-bg-card:        #1e222d;
+  --color-bg-elevated:    #252a37;
+  --color-bg-hover:       #2a2e3e;
+
+  /* ── Borders & separators ─────────────────────────────── */
+  --color-border-default: #2a2e3e;
+  --color-border-subtle:  #232738;
+
+  /* ── Text ─────────────────────────────────────────────── */
+  --color-text-primary:   #d1d4dc;
+  --color-text-secondary: #787b86;
+  --color-text-muted:     #555965;
+
+  /* ── Semantic: Trading signals ─────────────────────────── */
+  --color-buy:            #26a69a;
+  --color-sell:           #ef5350;
+  --color-buy-muted:      #26a69a33;
+  --color-sell-muted:     #ef535033;
+
+  /* ── Accent & brand ───────────────────────────────────── */
+  --color-accent:         #2962ff;
+  --color-accent-hover:   #1e53e5;
+  --color-gold:           #f0b90b;
+
+  /* ── Chart palette ────────────────────────────────────── */
+  --color-chart-candle-up:   #26a69a;
+  --color-chart-candle-down: #ef5350;
+  --color-chart-rsi:         #7e57c2;
+  --color-chart-macd:        #2196f3;
+  --color-chart-signal:      #ff9800;
+  --color-chart-histogram-pos: #26a69a80;
+  --color-chart-histogram-neg: #ef535080;
+
+  /* ── KPI card gradients ───────────────────────────────── */
+  --color-kpi-green-from:  #26a69a20;
+  --color-kpi-green-to:    #26a69a05;
+  --color-kpi-red-from:    #ef535020;
+  --color-kpi-red-to:      #ef535005;
+  --color-kpi-blue-from:   #2962ff20;
+  --color-kpi-blue-to:     #2962ff05;
+  --color-kpi-gold-from:   #f0b90b20;
+  --color-kpi-gold-to:     #f0b90b05;
+
+  /* ── Spacing & sizing ─────────────────────────────────── */
+  --radius-card:   12px;
+  --radius-button: 8px;
+
+  /* ── Typography ───────────────────────────────────────── */
+  --font-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+/* ── Global resets ──────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+/* ── Scrollbar styling ──────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-default);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* ── Utility: card glass effect ─────────────────────────── */
+.card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-card);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  border-color: var(--color-border-subtle);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+}
+
+/* ── Transitions ────────────────────────────────────────── */
+.transition-smooth {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Loading skeleton pulse ─────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-card) 25%,
+    var(--color-bg-elevated) 50%,
+    var(--color-bg-card) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-button);
+}
+
+/* ── Google Fonts injection ─────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
