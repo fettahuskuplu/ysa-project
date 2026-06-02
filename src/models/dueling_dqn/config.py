@@ -10,7 +10,7 @@ class DuelingDQNConfig:
     LEARNING_RATE = 0.0005
     GAMMA = 0.99
     BATCH_SIZE = 64
-    EPISODES = 50
+    EPISODES = 200
 
     # Epsilon-Greedy Strategy
     EPSILON_START = 1.0
@@ -18,7 +18,7 @@ class DuelingDQNConfig:
     EPSILON_DECAY = 0.995
 
     # Replay Buffer
-    MEMORY_SIZE = 10000
+    MEMORY_SIZE = 50000
 
     # Target Network
     TARGET_UPDATE_FREQUENCY = 10
