@@ -15,7 +15,7 @@ class DuelingDQNConfig:
     # Epsilon-Greedy Strategy
     EPSILON_START = 1.0
     EPSILON_END = 0.01
-    EPSILON_DECAY = 0.98
+    EPSILON_DECAY = 0.995
 
     # Replay Buffer
     MEMORY_SIZE = 50000
