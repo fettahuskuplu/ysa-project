@@ -1,11 +1,13 @@
 import sys 
 import os
-import numpy as np
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 from src.common.data_loader import BISTDataLoader
 from src.common.environment import TradingEnvironment
+from src.common.metrics import episode_metrics
 from config import DuelingDQNConfig
 from agent import DuelingDQNAgent
+
+INITIAL_BALANCE = 10_000.0
 
 def train():
     print("=" * 55)
@@ -47,7 +49,7 @@ def train():
         env = TradingEnvironment(
             market_data=X_train,
             real_prices=prices_train,
-            initial_balance=10_000.0,
+            initial_balance=INITIAL_BALANCE,
             window_size=DuelingDQNConfig.STATE_WINDOW_SIZE,
         )
         state = env.reset()
@@ -67,6 +69,13 @@ def train():
         agent.on_episode_end()
         episode_rewards.append(total_reward)
 
+        metrics = episode_metrics(
+            portfolio_history=env.portfolio_history,
+            reward_history=env.reward_history,
+            action_history=env.action_history,
+            initial_balance=INITIAL_BALANCE,
+        )
+
         # En iyi model kaydediliyor
         final_portfolio = env.portfolio_history[-1]
         if final_portfolio > best_portfolio:
@@ -77,9 +86,13 @@ def train():
         if episode % 10 == 0 or episode == 1:
             print(
                 f"  Episode {episode:3d}/{DuelingDQNConfig.EPISODES} | "
-                f"Ödül: {total_reward:8.2f} | "
-                f"Portföy: {final_portfolio:8.0f} TL | "
-                f"Epsilon: {agent.epsilon:.3f}"
+                f"Ödül:{total_reward:8.2f} | "
+                f"Portföy:{env.portfolio_history[-1]:8.0f} TL | "
+                f"Getiri:%{metrics['return_pct']:7.2f} | "
+                f"Sharpe:{metrics['sharpe_ratio']:6.3f} | "
+                f"MaxDD:%{metrics['max_drawdown_pct']:6.2f} | "
+                f"İşlem:{metrics['trade_count']:4d} | "
+                f"Eps:{agent.epsilon:.3f}"
             ) 
         
     print("\n" + "=" * 55)
@@ -87,6 +100,59 @@ def train():
     print(f"  En iyi portföy : {best_portfolio:,.0f} TL")
     print(f"  Model kaydı    : outputs/dueling_dqn_best.pth")
     print("=" * 55)
+    return X_train, X_test, prices_train, prices_test
+
+def evaluate(agent: DuelingDQNAgent, X_test, prices_test):
+    env = TradingEnvironment(
+        market_data=X_test,
+        real_prices=prices_test,
+        initial_balance=INITIAL_BALANCE,
+        window_size=DuelingDQNConfig.STATE_WINDOW_SIZE,
+    )
+
+    state = env.reset()
+    agent.epsilon = 0.0
+    done = False
+
+    while not done:
+        action = agent.select_action(state)
+        next_state, reward, done, info = env.step(action)
+        state = next_state
+
+    metrics = episode_metrics(
+        portfolio_history=env.portfolio_history,
+        reward_history=env.reward_history,
+        action_history=env.action_history,
+        initial_balance=INITIAL_BALANCE,
+    )
+
+    buy_count = env.action_history.count(1)
+    sell_count = env.action_history.count(2)
+    hold_count = env.action_history.count(0)
+
+    print("\n" + "=" * 55)
+    print("  TEST SONUÇLARI (metrics.py — export ile aynı)")
+    print("=" * 55)
+    print(f"  Başlangıç Sermayesi  : {INITIAL_BALANCE:,.0f} TL")
+    print(f"  Final Portföy        : {metrics['final_value']:,.0f} TL")
+    print(f"  Kümülatif Getiri     : %{metrics['return_pct']:.2f}")
+    print(f"  Sharpe Oranı         : {metrics['sharpe_ratio']:.4f}")
+    print(f"  Max Drawdown         : %{metrics['max_drawdown_pct']:.2f}")
+    print(f"  Toplam İşlem (AL+SAT): {metrics['trade_count']}")
+    print(f"  AL / SAT / BEKLE     : {buy_count} / {sell_count} / {hold_count}")
+    print("=" * 55)
+    return metrics
 
 if __name__ == "__main__":
-    train()
+    # Eğitim
+    X_train, X_test, prices_train, prices_test = train()
+
+    # Test
+    input_size = X_train.shape[1] * X_train.shape[2]
+
+    print("\n[Test Aşaması] Test eğitimi için en iyi model yükleniyor...")
+
+    test_agent = DuelingDQNAgent(input_size=input_size)
+    test_agent.load("outputs/dueling_dqn_best.pth")
+    
+    evaluate(test_agent, X_test, prices_test)
