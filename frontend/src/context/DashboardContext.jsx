@@ -149,7 +149,7 @@ export function DashboardProvider({ children }) {
           macdHistogram: bar.macdHistogram ?? 0,
         }));
 
-        const equityCurve =
+        const equityCurveSource =
           backendRawData.equity_curve?.length > 0
             ? backendRawData.equity_curve.map((p) => ({
                 time: p.time,
@@ -170,6 +170,19 @@ export function DashboardProvider({ children }) {
                 time: backendRawData.time_series?.[index]?.time ?? `day-${index}`,
                 value,
               }));
+
+        const equityCurve = Array.from(
+          { length: Math.max(equityCurveSource.length, benchmarkCurve.length) },
+          (_, index) => ({
+            time:
+              equityCurveSource[index]?.time ??
+              benchmarkCurve[index]?.time ??
+              backendRawData.time_series?.[index]?.time ??
+              `day-${index}`,
+            equityModel: equityCurveSource[index]?.value ?? 0,
+            equityBist30: benchmarkCurve[index]?.value ?? 0,
+          })
+        );
 
         const testPeriod = deriveTestPeriod(timeSeries, equityCurve);
 
