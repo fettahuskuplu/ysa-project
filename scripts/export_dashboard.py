@@ -8,8 +8,17 @@ Tüm modeller için dashboard JSON export.
 """
 from __future__ import annotations
 
-import argparse
 import sys
+try:
+    import pandas_ta
+except ModuleNotFoundError:
+    try:
+        import pandas_ta_classic
+        sys.modules["pandas_ta"] = pandas_ta_classic
+    except ModuleNotFoundError:
+        pass
+
+import argparse
 from pathlib import Path
 
 import numpy as np

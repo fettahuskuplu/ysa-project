@@ -19,7 +19,7 @@ def build_lstm_model(
     state_shape: Tuple[int, int],
     action_size: int,
     n_units: int = 32,
-    learning_rate: float = 0.0007,
+    learning_rate: float = 0.001,
     dropout_rate: float = 0.25,
 ) -> tf.keras.Model:
     """

@@ -51,7 +51,7 @@ logger: logging.Logger = logging.getLogger("LSTM-DQN")
 def train_agent(
     agent: LSTMDQNAgent,
     env: TradingEnvironment,
-    n_episodes: int = 50,
+    n_episodes: int = 10,
     batch_size: int = 32,
     replay_every: int = 4,
 ) -> Dict[str, Any]:
@@ -246,8 +246,8 @@ def main() -> None:
     parser.add_argument(
         "--episodes",
         type=int,
-        default=5,
-        help="Toplam episode sayısı (varsayılan: 5)",
+        default=10,
+        help="Toplam episode sayısı (varsayılan: 10)",
     )
     parser.add_argument(
         "--batch_size",
